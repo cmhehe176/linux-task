@@ -1,3 +1,4 @@
+from asyncio import Task
 from process import *
 from lib import *
 from cpu import *
@@ -60,85 +61,88 @@ class Shell:
         print("============================================================================")
         print(">>>>>>>>>>>>>>>>>>>>>         Start Running         <<<<<<<<<<<<<<<<<<<<<<<<")
         print("============================================================================")
-        while (1):
+        
+        while True:
             print("")
-            # Nếu không còn tiến trình nào trong hệ thống thì sẽ kết thúc mô phỏng
+            # Kiểm tra xem còn tiến trình nào trong hệ thống hay không
             if self.cpu.RunQueue.num + self.cpu.WaitQueue.num + len(self.cpu.preQueue) == 0:
                 print("============================================================================")
                 print(">>>>>>>>>>>>>>>>>>>>>>>      DONE ALL TASK!!!      <<<<<<<<<<<<<<<<<<<<<<<<<")
                 print("============================================================================")
                 break
+            
             print("Time clock:", self.cpu.clock)
-            # Kiểm tra hàng đợi xem có tiến trình nào muốn vào tại time clock
+            
+            # Kiểm tra xem có tiến trình nào muốn tham gia vào tại thời điểm hiện tại không
             if self.cpu.clock in self.cpu.preQueue.keys():
                 for process in list(self.cpu.preQueue[self.cpu.clock]):
                     self.cpu.RunQueue.enQueue(Node(process))
-                    print("Process {} dến => RunQueue".format(process.pid))
+                    print("Process {} đến => RunQueue".format(process.pid))
                 del self.cpu.preQueue[self.cpu.clock]
                 self.cpu.CurTask = self.cpu.RunQueue.header.next.task_struct
 
-            print("RunQueue: Fontier =>", self.cpu.RunQueue.get_id_process())
-            print("WaitQueue: Fontier =>", self.cpu.WaitQueue.get_id_process())
+            print("RunQueue: Front =>", self.cpu.RunQueue.get_id_process())
+            print("WaitQueue: Front =>", self.cpu.WaitQueue.get_id_process())
 
-            # Nếu tiến chỉ còn tiến trình đang đợi thì sẽ tiếp tục đợi IO
+            # Nếu chỉ còn các tiến trình đang đợi và có yêu cầu I/O, tiếp tục thực hiện I/O
             if self.cpu.WaitQueue.num != 0 and self.cpu.RunQueue.num == 0 and self.cpu.IO_FLAG:
-                self.cpu.clock = self.cpu.clock + 1
+                self.cpu.clock += 1
                 self.cpu.wake_up("io.txt")
                 time.sleep(1)
                 continue
 
-            # In ra thông tin tiến trình đang chạy
-            print("Process ID {} || Process counter {} || Running instructer {}".format(self.cpu.CurTask.pid,
-                                                                                        self.cpu.CurTask.pc,
-                                                                                        self.cpu.CurTask.instrucMem[
-                                                                                            self.cpu.CurTask.pc]))
-            # thực thi câu lệnh
-            flag = self.cpu.decoder.excute()
+            # In ra thông tin của tiến trình đang chạy
+            if self.cpu.CurTask is not None:
+                print("Process ID {} || Process counter {} || Running instruction {}".format(self.cpu.CurTask.pid,
+                                                                                                self.cpu.CurTask.pc,
+                                                                                                self.cpu.CurTask.instrucMem[
+                                                                                                    self.cpu.CurTask.pc]))
+                # thực thi câu lệnh
+                flag = self.cpu.decoder.execute()
 
-            # nếu chạy đến lệnh end => tiến trình hoàn thành  => cần phải tải tiến trình tiếp theo lên nếu có
-            if flag == 1:
-                print("Finish Process: Process {}".format(self.cpu.CurTask.pid))
-                print("============================Finish Process {}===============================".format(
-                    self.cpu.CurTask.pid))
+                # nếu chạy đến lệnh end => tiến trình hoàn thành  => cần phải tải tiến trình tiếp theo lên nếu có
+                if flag == 1:
+                    print("Finish Process: Process {}".format(self.cpu.CurTask.pid))
+                    print("============================Finish Process {}===============================".format(
+                        self.cpu.CurTask.pid))
 
-                self.cpu.release()
-                self.cpu.scheduler.time_slice = 0
-                self.cpu.rescheduler()
-                self.cpu.pidmanager.removePid(self.cpu.FinishTask)
-                self.cpu.remove_from_tasklist(self.cpu.FinishTask)
+                    self.cpu.release()
+                    self.cpu.scheduler.time_slice = 0
+                    self.cpu.rescheduler()
+                    self.cpu.pidmanager.removePid(self.cpu.CurTask)  # Thay self.cpu.FinishTask bằng self.cpu.CurTask
+                    self.cpu.remove_from_tasklist(self.cpu.CurTask)  # Thay self.cpu.FinishTask bằng self.cpu.CurTask
 
-            # nếu có câu lệnh yêu cầu IO
-            elif flag == 2:
-                self.cpu.IO_handle()
-                if self.cpu.RunQueue.num + self.cpu.WaitQueue.num + len(self.cpu.preQueue) == 0:
-                    print("done")
-                    continue
+                # nếu có câu lệnh yêu cầu IO
+                elif flag == 2:
+                    self.cpu.IO_handle()
+                    if self.cpu.RunQueue.num + self.cpu.WaitQueue.num + len(self.cpu.preQueue) == 0:
+                        print("done")
+                        continue
 
-            # nếu yêu cầu IO vẫn chưa được thỏa mãn
-            if self.cpu.IO_FLAG:
-                self.cpu.wake_up("io.txt")
+                # nếu yêu cầu IO vẫn chưa được thỏa mãn
+                if self.cpu.IO_FLAG:
+                    self.cpu.wake_up("io.txt")
 
-            # hết time slice mà tiến trình vẫn chưa xong và trong RunQueue vẫn còn tiến trình
-            if self.cpu.scheduler.time_slice == self.cpu.scheduler.QT_time and self.cpu.RunQueue.num > 1 and flag != 1:
-                print("============================Time Quantum Out===============================")
-                print("============================CONTEXT SWITCH=================================")
+                # hết time slice mà tiến trình vẫn chưa xong và trong RunQueue vẫn còn tiến trình
+                if self.cpu.scheduler.time_slice == self.cpu.scheduler.QT_time and self.cpu.RunQueue.num > 1 and flag != 1:
+                    print("============================Time Quantum Out===============================")
+                    print("============================CONTEXT SWITCH=================================")
 
-                # Tiến trình FinishTask ở đây được đặt vào
-                self.cpu.scheduler.time_slice = 0
-                self.cpu.FinishTask = self.cpu.RunQueue.deQueue().task_struct
-                self.cpu.CurTask = self.cpu.RunQueue.header.next.task_struct
-                self.cpu.RunQueue.enQueue(Node(self.cpu.FinishTask))
+                    # Tiến trình FinishTask ở đây được đặt vào
+                    self.cpu.scheduler.time_slice = 0
+                    self.cpu.CurTask = self.cpu.RunQueue.deQueue().task_struct  # Thay self.cpu.FinishTask bằng self.cpu.CurTask
+                    self.cpu.RunQueue.enQueue(Node(self.cpu.CurTask))
 
-                # Context Switch
-                self.cpu.swap_out(self.cpu.FinishTask)
-                print("Swap out process: Process {}".format(self.cpu.FinishTask.pid))
-                print("stack:", self.cpu.FinishTask.stack)
-                print("regis:", self.cpu.FinishTask.process_context.register)
-                self.cpu.swap_in(self.cpu.CurTask)
-                print("Swap in process: Process {}".format(self.cpu.CurTask.pid))
-                print("stack:", self.cpu.CurTask.stack)
-                print("regis:", self.cpu.CurTask.process_context.register)
-                print("============================================================================")
+                    # Context Switch
+                    self.cpu.swap_out(self.cpu.CurTask)  # Thay self.cpu.FinishTask bằng self.cpu.CurTask
+                    print("Swap out process: Process {}".format(self.cpu.CurTask.pid))
+                    print("stack:", self.cpu.CurTask.stack)
+                    print("regis:", self.cpu.CurTask.process_context.register)
+                    self.cpu.swap_in(self.cpu.CurTask)
+                    print("Swap in process: Process {}".format(self.cpu.CurTask.pid))
+                    print("stack:", self.cpu.CurTask.stack)
+                    print("regis:", self.cpu.CurTask.process_context.register)
+                    print("============================================================================")
 
             time.sleep(1)
 
