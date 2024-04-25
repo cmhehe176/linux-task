@@ -6,7 +6,7 @@ class Decoder:
     
     def convert_to_number(self, variable):
         """Kiểm tra xem tham số hàm là chữ só, biến hay thanh ghi, nếu là biến hoặc thành ghi thì sẽ trả về giá trị của nó
-
+#aslkdflkasdjfl
         Args:
             variable (string): Tên tham số  hàm (ví dụ a, b, _R1)
 
