@@ -130,3 +130,6 @@ class Decoder:
         self.cpu.CurTask.pc = self.cpu.CurTask.pc + 1
         return res
     
+
+
+    
