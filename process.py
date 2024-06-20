@@ -21,13 +21,16 @@ class task_struct:
         """
         self.state = state
         self.pid = pid
-        self.pc = 0;
+        self.pc = 0
         self.stack = {}
         self.excute_code = excute_code
         self.process_context = ProcessContext()
         self.arrival_time = arrival_time
         self.instrucMem = load_instruct(self.excute_code)
-
+        # Thêm thuộc tính start_time và finish_time
+        self.start_time = None     
+        self.finish_time = None
+        self.waiting_time = 0  # Thêm thuộc tính waiting_time
 
 class ProcessContext:
     """Chứa ngữ cảnh phần cứu khi xảy ra context switch
