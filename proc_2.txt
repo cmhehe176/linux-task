@@ -1,0 +1,4 @@
+set a 4
+mul 3 a _R4
+set b 5
+end

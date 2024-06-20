@@ -1,0 +1,6 @@
+set a 5
+add 3 a _R4
+add 3 _R4 _R1
+iorequest
+sub a 1 _R3
+end
