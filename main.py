@@ -1,7 +1,7 @@
-from shell import Shell
+from shell import *
 from decode import *
 from cpu import *
-from sched import scheduler
+from sched import *
 from process import *
 
 if __name__ == '__main__':
@@ -23,6 +23,3 @@ if __name__ == '__main__':
         # exit
         if res == 1:
             break
-
-#hello 
-#hihinhggghg
